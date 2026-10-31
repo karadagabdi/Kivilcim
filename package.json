@@ -1,0 +1,13 @@
+{
+  "name": "kivilcim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sınıf için oda kodlu canlı bilgi yarışması ve quiz stüdyosu",
+  "license": "MIT",
+  "scripts": {
+    "start": "node oyun/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
