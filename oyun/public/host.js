@@ -65,7 +65,7 @@ function updateLive(s) {
   $('#side').innerHTML = s.players.map((p, i) => `
     <li class="${reveal ? (p.correct ? 'ok' : 'miss') : ''} ${p.answer !== null ? 'done' : ''}">
       <span class="pos">${i + 1}</span>
-      <span class="name">${esc(p.name)}</span>
+      <span class="name">${avatarImg(p.avatar)}${esc(p.name)}</span>
       ${pick(p, reveal)}
       <span class="pts">${fmt(p.score)}${reveal && p.gain ? `<small>+${fmt(p.gain)}</small>` : ''}</span>
     </li>`).join('') || '<li class="muted">Oyuncu yok.</li>';
@@ -75,7 +75,7 @@ const VIEWS = {
   lobby(s) {
     const site = s.joinUrl.replace(/^https?:\/\//, '');
     const chips = s.players.length
-      ? `<ul class="chips">${s.players.map((p) => `<li class="chip">${esc(p.name)}
+      ? `<ul class="chips">${s.players.map((p) => `<li class="chip">${avatarImg(p.avatar)}${esc(p.name)}
           <button data-kick="${p.id}" aria-label="${esc(p.name)} oyundan çıkar" title="Çıkar">×</button></li>`).join('')}</ul>`
       : '<p class="empty">Henüz kimse yok. İlk katılan burada görünecek.</p>';
     return `<section class="lobby">
@@ -108,10 +108,10 @@ const VIEWS = {
   final(s) {
     const top = s.players.slice(0, 3);
     const steps = top.map((p, i) => `<div class="step p${i + 1}">
-      <div class="who">${esc(p.name)}</div><div class="score">${fmt(p.score)} puan</div>
+      ${avatarImg(p.avatar, 'av big')}<div class="who">${esc(p.name)}</div><div class="score">${fmt(p.score)} puan</div>
       <div class="block">${i + 1}</div></div>`).join('');
     const rest = s.players.slice(3, 10).map((p, i) => `<li style="--i:${i}">
-      <span class="pos">${i + 4}</span><span class="name">${esc(p.name)}</span><span></span><span class="pts">${fmt(p.score)}</span></li>`).join('');
+      <span class="pos">${i + 4}</span><span class="name">${avatarImg(p.avatar)}${esc(p.name)}</span><span></span><span class="pts">${fmt(p.score)}</span></li>`).join('');
     return `<h1 class="section-title">Kazananlar</h1>
       <div class="podium">${steps}</div>
       ${rest ? `<ol class="board">${rest}</ol>` : ''}

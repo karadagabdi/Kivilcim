@@ -1,6 +1,7 @@
 'use strict';
 
 const STORE = 'kivilcim-oyuncu';
+const AVATAR_STORE = 'kivilcim-avatar';
 const screen = $('#screen');
 let state = null;
 let renderedKey = '';
@@ -29,11 +30,39 @@ function showJoin(message = '', room = roomFromUrl()) {
       <input id="room" name="room" class="code-input" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autocomplete="off" placeholder="123 456" value="${esc(room)}" required>
       <label for="name">Ekranda görünecek adın</label>
       <input id="name" name="name" maxlength="20" autocomplete="nickname" autocapitalize="words" enterkeyhint="go" required>
+      <span class="label">Avatarın</span>
+      <div class="avatar-pick">
+        <img class="av-preview" id="av-preview" alt="Seçili avatar" width="88" height="88">
+        <button type="button" class="btn ghost" id="av-shuffle">Değiştir</button>
+      </div>
+      <div class="av-styles" id="av-styles" role="radiogroup" aria-label="Avatar stili"></div>
       <p class="error" id="err">${esc(message)}</p>
       <button class="btn primary" type="submit">Katıl</button>
     </form>`;
   const form = $('#join');
   (room.length === 6 ? form.name : form.room).focus();
+
+  // Tohum, "Değiştir"e basılana kadar yazılan isimden gelir; böylece avatar isimle birlikte anlık değişir.
+  let pref;
+  try { pref = JSON.parse(localStorage.getItem(AVATAR_STORE)) || {}; } catch { pref = {}; }
+  const avatar = { style: AVATAR_STYLES.includes(pref.style) ? pref.style : AVATAR_STYLES[0], seed: pref.seed || '' };
+  const current = () => ({ style: avatar.style, seed: avatar.seed || form.name.value.trim() || 'kivilcim' });
+  const drawAvatar = () => {
+    const a = current();
+    $('#av-preview').src = avatarUrl(a);
+    $('#av-styles').innerHTML = AVATAR_STYLES.map((style) => `
+      <button type="button" role="radio" aria-checked="${style === a.style}" aria-label="${style}" data-style="${style}">
+        <img src="${avatarUrl({ style, seed: a.seed })}" alt="" width="40" height="40"></button>`).join('');
+  };
+  let typing;
+  form.name.addEventListener('input', () => { clearTimeout(typing); if (!avatar.seed) typing = setTimeout(drawAvatar, 250); });
+  $('#av-shuffle').addEventListener('click', () => { avatar.seed = Math.random().toString(36).slice(2, 10); drawAvatar(); });
+  $('#av-styles').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-style]');
+    if (b) { avatar.style = b.dataset.style; drawAvatar(); }
+  });
+  drawAvatar();
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = form.querySelector('button');
@@ -41,7 +70,8 @@ function showJoin(message = '', room = roomFromUrl()) {
     try {
       const code = form.room.value.replace(/\D/g, '');
       if (code.length !== 6) throw new Error('Oda kodu 6 haneli olmalı.');
-      const { id } = await post('/api/join', { room: code, name: form.name.value });
+      const { id } = await post('/api/join', { room: code, name: form.name.value, avatar: current() });
+      localStorage.setItem(AVATAR_STORE, JSON.stringify(avatar));
       session = { room: code, id };
       localStorage.setItem(STORE, JSON.stringify(session));
       connect();
@@ -54,7 +84,7 @@ function showJoin(message = '', room = roomFromUrl()) {
 
 const VIEWS = {
   lobby: (s) => `
-    <div class="badge wait">${ICON.check}</div>
+    ${avatarImg(s.me.avatar, 'av-preview')}
     <h1>Hazırsın, ${esc(s.me.name)}.</h1>
     <p class="lead">Adın büyük ekranda. Oyun başlayınca ilk soru burada açılacak.</p>
     ${dots}`,

@@ -74,3 +74,8 @@ function runCountdown(getState) {
 }
 
 const fmt = (n) => n.toLocaleString('tr-TR');
+
+// Oyuncu avatarları: https://www.dicebear.com (SVG, tohum aynıysa resim de aynı).
+const AVATAR_STYLES = ['fun-emoji', 'adventurer', 'bottts', 'big-smile', 'pixel-art', 'thumbs'];
+const avatarUrl = (a) => `https://api.dicebear.com/9.x/${a.style}/svg?radius=50&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf&seed=${encodeURIComponent(a.seed)}`;
+const avatarImg = (a, cls = 'av') => (a ? `<img class="${cls}" src="${avatarUrl(a)}" alt="" loading="lazy" width="64" height="64">` : '');

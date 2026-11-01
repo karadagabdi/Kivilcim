@@ -302,6 +302,21 @@ body.offline .status-dot { display: inline; }
 .field label + input + label, .field input + label { margin-top: 10px; }
 .field input { width: 100%; min-width: 0; }
 
+/* ---------- Avatarlar (DiceBear) ---------- */
+.av { width: 28px; height: 28px; border-radius: 50%; flex: none; vertical-align: middle; margin-right: 8px; background: var(--paper); }
+.av.big { display: block; width: 72px; height: 72px; margin: 0 auto 8px; border: var(--edge); }
+.chip .av { margin: -3px 0 -3px -8px; }
+.side-list .av { width: 22px; height: 22px; }
+.field .label { font-weight: 700; font-size: .95rem; margin-top: 10px; }
+.avatar-pick { display: flex; align-items: center; gap: 16px; }
+.av-preview { width: 88px; height: 88px; border-radius: 50%; border: var(--edge); background: var(--paper); flex: none; }
+.screen.middle > .av-preview { margin: 0 auto; }
+.av-styles { display: flex; flex-wrap: wrap; gap: 8px; }
+.av-styles button { padding: 3px; border: 2px solid transparent; border-radius: 50%; background: var(--paper); cursor: pointer; line-height: 0; transition: border-color .15s, transform .15s; }
+.av-styles button:hover { transform: translateY(-2px); }
+.av-styles button[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,170,162,.25); }
+.av-styles img { width: 40px; height: 40px; border-radius: 50%; }
+
 /* ---------- Ortak bağlantılar ---------- */
 a { color: inherit; }
 .brand { text-decoration: none; color: inherit; }

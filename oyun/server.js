@@ -26,6 +26,14 @@ const TYPES = {
 
 const rooms = new Map();
 
+// Oyuncu avatarları DiceBear ile çizilir; sunucu yalnızca stil adını ve tohumu saklar.
+const AVATAR_STYLES = new Set(['fun-emoji', 'adventurer', 'bottts', 'big-smile', 'pixel-art', 'thumbs']);
+function cleanAvatar(raw, fallbackSeed) {
+  const style = raw && AVATAR_STYLES.has(raw.style) ? raw.style : 'fun-emoji';
+  const seed = clean(raw && raw.seed, 40) || fallbackSeed;
+  return { style, seed };
+}
+
 const clean = (v, max) => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
 
 // İstemciden gelen quizi asla doğrudan kullanma: biçimini ve sınırlarını burada denetle.
@@ -171,7 +179,7 @@ function view(room, c) {
     const reveal = room.phase === 'reveal';
     s.joinUrl = c.joinUrl;
     s.players = rank.map((p) => ({
-      id: p.id, name: p.name, score: p.score, answer: p.answer,
+      id: p.id, name: p.name, avatar: p.avatar, score: p.score, answer: p.answer,
       gain: reveal ? p.gain : 0, correct: reveal ? p.correct : null,
     }));
     return s;
@@ -179,7 +187,7 @@ function view(room, c) {
   const me = room.players.get(c.id);
   if (!me) return { phase: 'gone' };
   s.me = {
-    name: me.name, score: me.score, gain: me.gain, correct: me.correct,
+    name: me.name, avatar: me.avatar, score: me.score, gain: me.gain, correct: me.correct,
     answer: me.answer, streak: me.streak, rank: rank.indexOf(me) + 1,
   };
   return s;
@@ -267,7 +275,7 @@ async function join(req, res) {
     return send(res, 409, { error: 'Bu isim alınmış, başka bir isim dene.' });
   }
   const id = crypto.randomUUID();
-  room.players.set(id, { id, name, score: 0, streak: 0, gain: 0, correct: false, answer: null, answerAt: 0, joinedAt: Date.now() });
+  room.players.set(id, { id, name, avatar: cleanAvatar(body.avatar, name), score: 0, streak: 0, gain: 0, correct: false, answer: null, answerAt: 0, joinedAt: Date.now() });
   send(res, 200, { id });
   broadcast(room);
 }
