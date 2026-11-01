@@ -7,6 +7,32 @@ let session = null; // { code, key, quizId } — key yalnızca bu tarayıcıda d
 let stream = null;
 const stage = $('#stage');
 const spaced = (code) => `${code.slice(0, 3)} ${code.slice(3)}`;
+const inviteUrl = (s) => `${s.joinUrl}/?davet=${s.invite}`;
+
+// Pano API'si yalnızca https/localhost'ta çalışır; yerel ağ adresinde eski yönteme düş.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  }
+}
+
+async function copyInvite() {
+  if (!state) return;
+  const url = inviteUrl(state);
+  if (await copyText(url)) toast('Davet linki kopyalandı. Gruba yapıştırıp gönderebilirsin.');
+  else prompt('Linki kopyala:', url);
+}
 
 // Şık kutuları; sayılar ve çubuklar updateLive() ile anlık güncellenir.
 const options = (q, reveal) => `<ol class="opts">${q.options.map((text, i) => {
@@ -87,6 +113,10 @@ const VIEWS = {
           <div><p class="eyebrow">Oda kodu</p><div class="join-url">${spaced(s.code)}</div></div>
         </div>
         <p class="hint">Telefonundan adresi aç, oda kodunu ve adını yaz. Kendi internetinle, istediğin yerden katılabilirsin.</p>
+        <div class="invite">
+          <button class="btn ghost" data-invite type="button">Davet linkini kopyala</button>
+          <span class="muted">Gruba gönder; linke tıklayan oda kodunu ve adını yazıp katılır.</span>
+        </div>
         <ol class="steps">
           <li>Adresi aç, oda kodunu ve adını yaz.</li>
           <li>Soru ekranda çıkınca cevabını telefondan seç.</li>
@@ -129,6 +159,7 @@ function render(s) {
   $('#meta').innerHTML = s.question && s.phase !== 'final'
     ? `Oda <b>${spaced(s.code)}</b> · Soru <b>${s.question.number}</b> / ${s.total} · ${s.playerCount} oyuncu`
     : `Oda <b>${spaced(s.code)}</b> · ${s.playerCount} oyuncu`;
+  $('#meta').insertAdjacentHTML('beforeend', ' <button class="btn small ghost" data-invite type="button">Davet linki</button>');
 
   // Soru sırasında her yeni cevapta tüm ekranı yeniden çizme; sadece canlı kısımları güncelle.
   const key = s.phase === 'lobby' ? 'lobby:' + s.players.map((p) => p.id).join() : `${s.phase}:${s.question?.number}`;
@@ -149,9 +180,13 @@ async function act(action, body) {
   }
 }
 
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-invite]')) copyInvite();
+});
+
 stage.addEventListener('click', (e) => {
   const btn = e.target.closest('button');
-  if (!btn || btn.disabled) return;
+  if (!btn || btn.disabled || 'invite' in btn.dataset) return;
   if (btn.dataset.kick) act('kick', { id: btn.dataset.kick });
   else if (btn.dataset.act) { btn.disabled = true; act(btn.dataset.act); }
 });

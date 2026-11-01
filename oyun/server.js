@@ -60,6 +60,7 @@ function createRoom(quiz) {
   const room = {
     code,
     hostKey: crypto.randomUUID(),
+    invite: crypto.randomBytes(6).toString('base64url'), // paylaşılan davet linki; kodu içermez
     quiz,
     phase: 'lobby', index: -1, questions: [], startedAt: 0, deadline: 0, duration: 0, nextAt: 0, timer: null, counts: [],
     players: new Map(),
@@ -137,6 +138,8 @@ function advance(room) {
 function resetGame(room) {
   clearTimeout(room.timer);
   Object.assign(room, { phase: 'lobby', index: -1, questions: [], counts: [], nextAt: 0 });
+  // Oyun bittikten sonra çıkanlar kürsüde kalır; yeni oyuna taşınmazlar.
+  for (const p of room.players.values()) if (p.left) room.players.delete(p.id);
   for (const p of room.players.values()) Object.assign(p, { score: 0, streak: 0, gain: 0, correct: false, answer: null });
 }
 
@@ -178,6 +181,7 @@ function view(room, c) {
     // Yönetici, kimin hangi şıkkı seçtiğini anlık görür (doğru/yanlış bilgisi yalnızca süre bitince).
     const reveal = room.phase === 'reveal';
     s.joinUrl = c.joinUrl;
+    s.invite = room.invite;
     s.players = rank.map((p) => ({
       id: p.id, name: p.name, avatar: p.avatar, score: p.score, answer: p.answer,
       gain: reveal ? p.gain : 0, correct: reveal ? p.correct : null,
@@ -232,6 +236,17 @@ function readBody(req, limit = 10000) {
 
 const NO_ROOM = { error: 'Bu kodla açık bir oda yok. Kodu kontrol et.' };
 const isHost = (room, key) => typeof key === 'string' && key === room.hostKey;
+const byInvite = (slug) => [...rooms.values()].find((r) => r.invite === slug);
+
+function removePlayer(room, id) {
+  const p = room.players.get(id);
+  if (!p) return;
+  // Bitmiş oyunda sıralama ekranda kalsın diye oyuncu yalnızca işaretlenir.
+  if (room.phase === 'final') p.left = true;
+  else room.players.delete(id);
+  if (room.phase === 'question' && everyoneAnswered(room)) endQuestion(room);
+  else broadcast(room);
+}
 
 function openStream(req, res, url) {
   const room = rooms.get(url.searchParams.get('room'));
@@ -265,6 +280,11 @@ async function newRoom(req, res) {
 async function join(req, res) {
   const body = await readBody(req);
   const room = rooms.get(String(body.room || '').trim());
+  if (body.invite) {
+    const invited = byInvite(String(body.invite));
+    if (!invited) return send(res, 404, { error: 'Bu davet linkinin odası kapanmış.' });
+    if (invited !== room) return send(res, 400, { error: 'Bu kod davet edildiğin odaya ait değil.' });
+  }
   if (!room) return send(res, 404, NO_ROOM);
   const name = String(body.name || '').trim().replace(/\s+/g, ' ').slice(0, 20);
   if (name.length < 2) return send(res, 400, { error: 'İsim en az 2 harf olmalı.' });
@@ -297,6 +317,13 @@ async function answer(req, res) {
   send(res, 200, { ok: true });
   if (everyoneAnswered(room)) endQuestion(room);
   else broadcast(room);
+}
+
+async function leave(req, res) {
+  const { room: code, id } = await readBody(req);
+  const room = rooms.get(code);
+  if (room) removePlayer(room, id);
+  send(res, 200, { ok: true });
 }
 
 async function hostAction(req, res, action) {
@@ -344,6 +371,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/saglik') return send(res, 200, { ok: true, rooms: rooms.size });
     if (req.method === 'POST' && url.pathname === '/api/rooms') return await newRoom(req, res);
     if (req.method === 'POST' && url.pathname === '/api/join') return await join(req, res);
+    if (req.method === 'POST' && url.pathname === '/api/leave') return await leave(req, res);
+    if (req.method === 'GET' && url.pathname.startsWith('/api/invite/')) {
+      const room = byInvite(url.pathname.slice('/api/invite/'.length));
+      return room ? send(res, 200, { title: room.quiz.title }) : send(res, 404, { error: 'Bu davet linkinin odası kapanmış.' });
+    }
     if (req.method === 'POST' && url.pathname === '/api/answer') return await answer(req, res);
     if (req.method === 'POST' && url.pathname.startsWith('/api/host/')) {
       return await hostAction(req, res, url.pathname.slice('/api/host/'.length));

@@ -6,7 +6,7 @@ const screen = $('#screen');
 let state = null;
 let renderedKey = '';
 let stream = null;
-let session = null; // { room, id }
+let session = null; // { room, id, invite? }
 
 const ICON = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -15,16 +15,34 @@ const ICON = {
 };
 const dots = '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>';
 
-const roomFromUrl = () => (new URLSearchParams(location.search).get('oda') || '').replace(/\D/g, '').slice(0, 6);
+const params = new URLSearchParams(location.search);
+const roomFromUrl = () => (params.get('oda') || '').replace(/\D/g, '').slice(0, 6);
+// Davet linki (?davet=…) odayı gösterir ama kodu içermez; kod yine elle girilir.
+let invite = (params.get('davet') || '').replace(/[^\w-]/g, '').slice(0, 20);
 
-function showJoin(message = '', room = roomFromUrl()) {
+async function showInvite() {
+  screen.className = 'screen middle';
+  screen.innerHTML = dots;
+  try {
+    const { title } = await fetch('/api/invite/' + invite).then((r) => (r.ok ? r.json() : Promise.reject()));
+    showJoin('', '', title);
+  } catch {
+    invite = '';
+    history.replaceState(null, '', '/');
+    showJoin('Bu davet linkinin odası kapanmış. Oda kodunu biliyorsan aşağıya yazabilirsin.', '');
+  }
+}
+
+function showJoin(message = '', room = roomFromUrl(), inviteTitle = '') {
   state = null;
   renderedKey = 'join';
   $('#meta').textContent = '';
+  $('#leave').hidden = true;
   screen.className = 'screen middle';
   screen.innerHTML = `
-    <p class="eyebrow">Canlı bilgi yarışması</p>
-    <h1>Oda kodunu gir, oyuna katıl.</h1>
+    <p class="eyebrow">${inviteTitle ? 'Davet edildin' : 'Canlı bilgi yarışması'}</p>
+    <h1>${inviteTitle ? `“${esc(inviteTitle)}” oyununa katıl.` : 'Oda kodunu gir, oyuna katıl.'}</h1>
+    ${inviteTitle ? '<p class="lead">Öğretmeninin ekranındaki 6 haneli oda kodunu ve adını yaz.</p>' : ''}
     <form id="join" class="field" novalidate>
       <label for="room">Oda kodu</label>
       <input id="room" name="room" class="code-input" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autocomplete="off" placeholder="123 456" value="${esc(room)}" required>
@@ -48,6 +66,7 @@ function showJoin(message = '', room = roomFromUrl()) {
   const avatar = { style: AVATAR_STYLES.includes(pref.style) ? pref.style : AVATAR_STYLES[0], seed: pref.seed || '' };
   const current = () => ({ style: avatar.style, seed: avatar.seed || form.name.value.trim() || 'kivilcim' });
   const drawAvatar = () => {
+    if (!form.isConnected) return; // katıldıktan sonra gecikmeli çizim gelirse
     const a = current();
     $('#av-preview').src = avatarUrl(a);
     $('#av-styles').innerHTML = AVATAR_STYLES.map((style) => `
@@ -70,9 +89,9 @@ function showJoin(message = '', room = roomFromUrl()) {
     try {
       const code = form.room.value.replace(/\D/g, '');
       if (code.length !== 6) throw new Error('Oda kodu 6 haneli olmalı.');
-      const { id } = await post('/api/join', { room: code, name: form.name.value, avatar: current() });
+      const { id } = await post('/api/join', { room: code, name: form.name.value, avatar: current(), invite: inviteTitle ? invite : undefined });
       localStorage.setItem(AVATAR_STORE, JSON.stringify(avatar));
-      session = { room: code, id };
+      session = { room: code, id, invite: inviteTitle ? invite : undefined };
       localStorage.setItem(STORE, JSON.stringify(session));
       connect();
     } catch (err) {
@@ -121,7 +140,8 @@ const VIEWS = {
     <p class="eyebrow">Oyun bitti</p>
     <p class="big-num">${s.me.rank}.</p>
     <h1>${s.me.rank === 1 ? 'Birincisin, tebrikler!' : s.me.rank <= 3 ? 'Kürsüdesin!' : 'Güzel oyundu.'}</h1>
-    <p class="lead">${fmt(s.me.score)} puan topladın.</p>`,
+    <p class="lead">${fmt(s.me.score)} puan topladın.</p>
+    <button class="btn primary" type="button" data-leave>Başka odaya katıl</button>`,
 };
 
 function render(s) {
@@ -131,6 +151,9 @@ function render(s) {
     return showJoin('Oyundan çıkarıldın ya da oda kapandı. Tekrar katılabilirsin.', session ? session.room : roomFromUrl());
   }
   state = s;
+  $('#leave').hidden = s.phase === 'final';
+  // Biten oyun hatırlanmasın: sayfa yeniden açılınca doğrudan kod ekranı gelsin.
+  if (s.phase === 'final') localStorage.removeItem(STORE);
   $('#meta').textContent = s.question && s.phase !== 'final' ? `${s.question.number} / ${s.total} · ${fmt(s.me.score)} puan` : s.me.name;
 
   const key = `${s.phase}:${s.question?.number}:${s.me.answer}`;
@@ -141,7 +164,26 @@ function render(s) {
   if (s.phase === 'reveal' && navigator.vibrate) navigator.vibrate(s.me.correct ? 60 : [40, 60, 40]);
 }
 
+// Oyundan çık (oyun sırasında ya da bittikten sonra) ve temiz bir kod ekranına dön.
+async function leave() {
+  if (stream) stream.close();
+  stream = null;
+  localStorage.removeItem(STORE);
+  const old = session;
+  session = null;
+  invite = '';
+  history.replaceState(null, '', '/');
+  showJoin('', '');
+  if (old) post('/api/leave', { room: old.room, id: old.id }).catch(() => {});
+}
+
+$('#leave').addEventListener('click', () => {
+  if (state && state.phase !== 'final' && !confirm('Oyundan çıkmak istiyor musun? Puanın silinecek.')) return;
+  leave();
+});
+
 screen.addEventListener('click', async (e) => {
+  if (e.target.closest('[data-leave]')) return leave();
   const btn = e.target.closest('[data-choice]');
   if (!btn || !state || state.phase !== 'question') return;
   const buttons = screen.querySelectorAll('[data-choice]');
@@ -165,6 +207,8 @@ function connect() {
 try { session = JSON.parse(localStorage.getItem(STORE)); } catch { session = null; }
 // Bağlantıyla farklı bir odaya geldiyse eski oturumu kullanma.
 const linked = roomFromUrl();
-if (session && session.room && session.id && (!linked || linked === session.room)) connect();
+const sameRoom = invite ? session && session.invite === invite : !linked || (session && linked === session.room);
+if (session && session.room && session.id && sameRoom) connect();
+else if (invite) showInvite();
 else showJoin();
 runCountdown(() => state);
