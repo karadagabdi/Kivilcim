@@ -31,9 +31,9 @@
   --lift: 3px 3px 0 var(--ink);
   --lift-hi: 5px 5px 0 var(--ink);
 
-  --display: 'Bricolage Grotesque', 'Figtree', system-ui, sans-serif;
-  --body: 'Figtree', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --hand: 'Caveat', 'Bricolage Grotesque', cursive;
+  --display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --body: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --hand: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -345,7 +345,7 @@ a.btn { text-decoration: none; }
 
 .empty-state { border: 2px dashed var(--ink-2); background: rgba(255,253,247,.6); border-radius: 22px; padding: clamp(28px, 5vw, 56px); text-align: center; display: grid; gap: 14px; justify-items: center; }
 .empty-state h2 { font-size: 2rem; letter-spacing: -.04em; }
-.empty-state h2::before { content: ''; display: block; width: 56px; height: 56px; margin: 0 auto 14px; background: url(/logo.svg) center/contain no-repeat; transform: rotate(-6deg); }
+.empty-state h2::before { content: ''; display: block; width: 180px; height: 142px; margin: 0 auto 18px; background: url(/logom.png) center/contain no-repeat; }
 .empty-state .lead { max-width: 50ch; }
 
 .formats { border-top: 1.5px dashed var(--line); padding-top: 28px; }
